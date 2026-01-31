@@ -10,7 +10,7 @@ import {
 } from "react";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { fetchBoard, createCard, deleteCard, toBoardData, updateCard, updateColumn } from "@/lib/api";
-import { findCardLocation, type BoardData } from "@/lib/kanban";
+import { findCardLocation, fromCardId, fromColumnId, type BoardData } from "@/lib/kanban";
 
 const CREDENTIALS = { username: "user", password: "password" };
 
@@ -77,8 +77,13 @@ export default function Home() {
   }, [isAuthenticated, refreshBoard]);
 
   const handleRenameColumn = async (columnId: string, title: string) => {
+    const columnIdNumber = Number(fromColumnId(columnId));
+    if (Number.isNaN(columnIdNumber)) {
+      setBoardError("Unable to save column changes.");
+      return;
+    }
     try {
-      await updateColumn(Number(columnId), { title }, username);
+      await updateColumn(columnIdNumber, { title }, username);
     } catch (err) {
       setBoardError("Unable to save column changes.");
       refreshBoard();
@@ -86,7 +91,7 @@ export default function Home() {
   };
 
   const handleAddCard = async (columnId: string, title: string, details: string) => {
-    const columnIdNumber = Number(columnId);
+    const columnIdNumber = Number(fromColumnId(columnId));
     if (Number.isNaN(columnIdNumber)) {
       setBoardError("Unable to add the card.");
       return;
@@ -108,7 +113,7 @@ export default function Home() {
   };
 
   const handleDeleteCard = async (columnId: string, cardId: string) => {
-    const cardIdNumber = Number(cardId);
+    const cardIdNumber = Number(fromCardId(cardId));
     if (Number.isNaN(cardIdNumber)) {
       return;
     }
@@ -130,8 +135,8 @@ export default function Home() {
     if (!location) {
       return;
     }
-    const cardIdNumber = Number(activeId);
-    const columnIdNumber = Number(location.columnId);
+    const cardIdNumber = Number(fromCardId(activeId));
+    const columnIdNumber = Number(fromColumnId(location.columnId));
     if (Number.isNaN(cardIdNumber) || Number.isNaN(columnIdNumber)) {
       return;
     }

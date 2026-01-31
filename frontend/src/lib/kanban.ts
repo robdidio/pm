@@ -15,6 +15,16 @@ export type BoardData = {
   cards: Record<string, Card>;
 };
 
+const ensurePrefix = (value: string | number, prefix: string) => {
+  const stringValue = String(value);
+  return stringValue.startsWith(prefix) ? stringValue : `${prefix}${stringValue}`;
+};
+
+export const toColumnId = (value: string | number) => ensurePrefix(value, "col-");
+export const toCardId = (value: string | number) => ensurePrefix(value, "card-");
+export const fromColumnId = (value: string) => value.replace(/^col-/, "");
+export const fromCardId = (value: string) => value.replace(/^card-/, "");
+
 export const initialData: BoardData = {
   columns: [
     { id: "col-backlog", title: "Backlog", cardIds: ["card-1", "card-2"] },

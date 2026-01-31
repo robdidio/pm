@@ -5,12 +5,16 @@ import type { Card } from "@/lib/kanban";
 
 type KanbanCardProps = {
   card: Card;
+  columnId: string;
   onDelete: (cardId: string) => void;
 };
 
-export const KanbanCard = ({ card, onDelete }: KanbanCardProps) => {
+export const KanbanCard = ({ card, columnId, onDelete }: KanbanCardProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: card.id });
+    useSortable({
+      id: `card-${card.id}`,
+      data: { cardId: card.id, columnId },
+    });
 
   const style = {
     transform: CSS.Transform.toString(transform),

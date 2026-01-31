@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -8,6 +8,10 @@ import {
   useSensor,
   useSensors,
   closestCorners,
+  pointerWithin,
+  rectIntersection,
+  MeasuringStrategy,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -44,27 +48,84 @@ export const KanbanBoard = ({
   );
 
   const cardsById = useMemo(() => board.cards, [board.cards]);
+  const lastOverId = useRef<string | null>(null);
+
+  const collisionDetection: CollisionDetection = useMemo(
+    () => (args) =>
+      {
+        const filtered = {
+          ...args,
+          droppableContainers: args.droppableContainers.filter(
+            (container) => container.id !== args.active.id
+          ),
+        };
+        const pointerCollisions = pointerWithin(filtered);
+        if (pointerCollisions.length > 0) {
+          return pointerCollisions;
+        }
+        const intersections = rectIntersection(filtered);
+        if (intersections.length > 0) {
+          return intersections;
+        }
+        return closestCorners(filtered);
+      },
+    []
+  );
 
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveCardId(event.active.id as string);
+    const activeId = event.active.data.current?.cardId as string | undefined;
+    if (!activeId) {
+      return;
+    }
+    setActiveCardId(activeId);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveCardId(null);
 
-    if (!over || active.id === over.id) {
+    const activeId = active.data.current?.cardId as string | undefined;
+    const activeColumnId = active.data.current?.columnId as string | undefined;
+    const overIdFromData = over?.data.current?.cardId as string | undefined;
+    const overColumnFromData = over?.data.current?.columnId as string | undefined;
+    const isCrossColumn =
+      activeColumnId && overColumnFromData && activeColumnId !== overColumnFromData;
+    const resolvedOverId =
+      (overIdFromData && overIdFromData !== activeId && !isCrossColumn
+        ? overIdFromData
+        : undefined) ??
+      overColumnFromData ??
+      lastOverId.current;
+    if (!activeId || !resolvedOverId || activeId === resolvedOverId) {
+      lastOverId.current = null;
       return;
     }
 
+    const overId = resolvedOverId;
+
     setBoard((prev) => {
-      const nextColumns = moveCard(prev.columns, active.id as string, over.id as string);
-      onMoveCard?.(active.id as string, over.id as string, nextColumns);
+      const nextColumns = moveCard(prev.columns, activeId, overId);
+      onMoveCard?.(activeId, overId, nextColumns);
       return {
         ...prev,
         columns: nextColumns,
       };
     });
+
+    lastOverId.current = null;
+  };
+
+  const handleDragOver = (event: { active: DragEndEvent["active"]; over: DragEndEvent["over"] }) => {
+    if (event.over) {
+      const activeColumnId = event.active.data.current?.columnId as string | undefined;
+      const overCardId = event.over.data.current?.cardId as string | undefined;
+      const overColumnId = event.over.data.current?.columnId as string | undefined;
+      if (activeColumnId && overColumnId && activeColumnId !== overColumnId) {
+        lastOverId.current = overColumnId;
+        return;
+      }
+      lastOverId.current = overCardId ?? overColumnId ?? null;
+    }
   };
 
   const handleRenameColumn = (columnId: string, title: string) => {
@@ -174,8 +235,10 @@ export const KanbanBoard = ({
 
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCorners}
+          measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+          collisionDetection={collisionDetection}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
           <section className="grid gap-6 lg:grid-cols-5">

@@ -122,16 +122,36 @@ Design decisions (Part 7)
 ## Part 8: AI connectivity (OpenRouter)
 
 Checklist
-- [ ] Add backend client that calls OpenRouter with model openai/gpt-oss-120b.
-- [ ] Read OPENROUTER_API_KEY from .env.
-- [ ] Implement a simple test endpoint to verify AI connectivity.
+- [x] Add backend client that calls OpenRouter with model openai/gpt-oss-120b.
+- [x] Read OPENROUTER_API_KEY from .env.
+- [x] Implement a simple /api/chat endpoint to verify AI connectivity.
+- [x] Hardcode OpenRouter base URL for now.
+
+Notes (Part 8 decisions)
+- Use /api/chat for the connectivity endpoint.
+- Run a live call to OpenRouter for testing (no mocking).
+- Keep the OpenRouter base URL hardcoded.
 
 Tests
-- [ ] Unit test that mocks OpenRouter responses.
-- [ ] Integration test that validates the "2+2" response path (mocked).
+- [x] Unit test that returns 500 when OPENROUTER_API_KEY is missing.
+- [x] Integration test that validates the "2+2" response path via live OpenRouter (skipped if env is missing).
 
 Success criteria
-- OpenRouter connectivity verified and guarded with tests.
+- OpenRouter connectivity verified with a live response and guarded with tests.
+
+Testing notes (added after Part 8)
+- For live integration/E2E tests, start the container in detached mode so the terminal can run tests:
+	- docker build -t pm-app .
+	- docker rm -f pm-app || true
+	- docker run -d --name pm-app --env-file .env -p 8000:8000 pm-app
+- Wait for readiness via /health before tests:
+	- curl -sf http://127.0.0.1:8000/health
+- Backend tests require repo root on PYTHONPATH:
+	- PM_BASE_URL=http://127.0.0.1:8000 PYTHONPATH=/absolute/path/to/repo pytest backend
+- Frontend tests:
+	- npm run test:all (runs unit + Playwright). Playwright uses the backend-served app at 8000.
+- Stop the container when done:
+	- ./scripts/stop-mac.sh (or platform equivalent)
 
 ## Part 9: AI structured outputs for Kanban updates
 

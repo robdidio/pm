@@ -3,12 +3,21 @@ import sqlite3
 from pathlib import Path
 from typing import Generator, Iterable
 
+import httpx
+from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 app = FastAPI()
+
+
+ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(ENV_PATH)
+
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_MODEL = "openai/gpt-oss-120b"
 
 
 class ColumnCreate(BaseModel):
@@ -33,6 +42,14 @@ class CardUpdate(BaseModel):
     details: str | None = None
     column_id: int | None = None
     position: int | None = None
+
+
+class ChatRequest(BaseModel):
+    message: str
+
+
+class ChatResponse(BaseModel):
+    response: str
 
 
 DEFAULT_USER = "user"
@@ -295,6 +312,48 @@ def _get_username(x_user: str | None = Header(default=None)) -> str:
     return x_user or DEFAULT_USER
 
 
+def _get_openrouter_api_key() -> str | None:
+    return os.getenv("OPENROUTER_API_KEY")
+
+
+def _call_openrouter(message: str) -> str:
+    api_key = _get_openrouter_api_key()
+    if not api_key:
+        raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY not configured")
+
+    payload = {
+        "model": OPENROUTER_MODEL,
+        "messages": [{"role": "user", "content": message}],
+        "temperature": 0,
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        response = httpx.post(
+            f"{OPENROUTER_BASE_URL}/chat/completions",
+            json=payload,
+            headers=headers,
+            timeout=20,
+        )
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="OpenRouter request failed") from exc
+
+    if response.status_code >= 400:
+        raise HTTPException(status_code=502, detail="OpenRouter returned an error")
+
+    data = response.json()
+    choices = data.get("choices", [])
+    if not choices:
+        raise HTTPException(status_code=502, detail="OpenRouter response missing choices")
+    message_data = choices[0].get("message")
+    if not message_data or "content" not in message_data:
+        raise HTTPException(status_code=502, detail="OpenRouter response missing content")
+    return str(message_data["content"]).strip()
+
+
 @app.on_event("startup")
 def startup() -> None:
     _init_db()
@@ -308,6 +367,12 @@ def health_check() -> dict:
 @app.get("/api/hello")
 def hello() -> dict:
     return {"message": "Hello from FastAPI"}
+
+
+@app.post("/api/chat", response_model=ChatResponse)
+def chat(payload: ChatRequest) -> ChatResponse:
+    response_text = _call_openrouter(payload.message)
+    return ChatResponse(response=response_text)
 
 
 @app.get("/api/board")

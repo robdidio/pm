@@ -113,6 +113,7 @@ class AiBoardResponse(BaseModel):
     schemaVersion: int
     board: BoardPayload
     operations: list[AiOperation]
+    assistantMessage: str | None = None
 
 
 def is_authenticated(request: Request) -> bool:
@@ -235,8 +236,23 @@ def build_ai_system_prompt(board: dict[str, Any]) -> str:
                 "details": "Details",
             }
         ],
+        "assistantMessage": "Updated card-1 details.",
+    }
+    summary_example = {
+        "schemaVersion": 1,
+        "board": {
+            "columns": [
+                {"id": "col-1", "title": "Todo", "cardIds": ["card-1"]},
+            ],
+            "cards": {
+                "card-1": {"id": "card-1", "title": "Title", "details": "Details"},
+            },
+        },
+        "operations": [],
+        "assistantMessage": "Summary: The board tracks planning, discovery, delivery, and QA work.",
     }
     schema_json = json.dumps(schema_example, ensure_ascii=True)
+    summary_json = json.dumps(summary_example, ensure_ascii=True)
 
     return (
         "You are a project management assistant. "
@@ -245,13 +261,47 @@ def build_ai_system_prompt(board: dict[str, Any]) -> str:
         "{schemaVersion:1, board:{columns:[{id,title,cardIds}], cards:{[id]:{id,title,details}}}, operations:[...]} "
         "Include a full board replacement and an operations list. "
         "If no changes are needed, return the current board and an empty operations array. "
+        "If the user asks for a summary or non-board update, you MUST include assistantMessage with the reply,"
+        " keep the board unchanged, and set operations to an empty array. "
         "Use schemaVersion 1. "
         "Use unique string ids; for new cards prefer 'card-' prefix. "
         "Operations types: create_card, update_card, move_card, delete_card, rename_column. "
         "Ensure every cardId in columns exists in cards. "
         f"Schema example: {schema_json} "
+        f"Summary example: {summary_json} "
         f"Board context: {board_json}"
     )
+
+
+def is_summary_request(messages: list[ChatMessage]) -> bool:
+    for message in reversed(messages):
+        if message.role != "user":
+            continue
+        content = message.content.lower()
+        return "summarize" in content or "summary" in content
+    return False
+
+
+def build_board_summary(board: BoardPayload) -> str:
+    total_cards = len(board.cards)
+    lines = [f"Summary: {len(board.columns)} columns, {total_cards} cards."]
+
+    for column in board.columns:
+        titles = [
+            board.cards[card_id].title
+            for card_id in column.cardIds
+            if card_id in board.cards
+        ]
+        if not titles:
+            lines.append(f"{column.title} (0): No cards.")
+            continue
+
+        preview = "; ".join(titles[:3])
+        if len(titles) > 3:
+            preview = f"{preview}; ..."
+        lines.append(f"{column.title} ({len(titles)}): {preview}")
+
+    return "\n".join(lines)
 
 
 def parse_ai_board_response(raw: str) -> AiBoardResponse:
@@ -337,6 +387,15 @@ def ai_board(payload: AiBoardRequest, request: Request) -> dict[str, Any]:
     with db.get_connection(get_db_path()) as conn:
         board = db.fetch_board(conn, db.DEFAULT_BOARD_ID)
 
+    if is_summary_request(payload.messages):
+        summary = build_board_summary(BoardPayload.model_validate(board))
+        return {
+            "schemaVersion": 1,
+            "operations": [],
+            "board": board,
+            "assistantMessage": summary,
+        }
+
     system_prompt = build_ai_system_prompt(board)
     messages = [
         {"role": "system", "content": system_prompt},
@@ -348,6 +407,9 @@ def ai_board(payload: AiBoardRequest, request: Request) -> dict[str, Any]:
 
     response = call_openrouter_messages(messages)
     ai_response = parse_ai_board_response(response)
+    if not ai_response.assistantMessage and is_summary_request(payload.messages):
+        summary = build_board_summary(ai_response.board)
+        ai_response = ai_response.model_copy(update={"assistantMessage": summary})
     column_inputs, card_inputs = build_board_inputs(ai_response.board)
 
     with db.get_connection(get_db_path()) as conn:

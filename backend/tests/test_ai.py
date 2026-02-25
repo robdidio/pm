@@ -108,3 +108,24 @@ def test_ai_board_rejects_invalid_schema(tmp_path: Path, monkeypatch: pytest.Mon
 
     assert response.status_code == 502
     assert response.json()["detail"] == "openrouter_invalid_schema"
+
+
+def test_ai_board_summary_bypasses_ai(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    setup_test_db(tmp_path)
+    client = TestClient(app)
+    login(client)
+
+    def fake_call_openrouter_messages(_: list[dict[str, str]]) -> str:
+        raise AssertionError("AI should not be called for summaries")
+
+    monkeypatch.setattr(main_module, "call_openrouter_messages", fake_call_openrouter_messages)
+
+    response = client.post(
+        "/api/ai/board",
+        json={"messages": [{"role": "user", "content": "Please summarize my project"}]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["operations"] == []
+    assert payload["assistantMessage"].startswith("Summary:")

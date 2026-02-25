@@ -258,14 +258,18 @@ export const KanbanBoard = () => {
         const data = (await response.json()) as {
           board: BoardData;
           operations: Array<{ type: string }>;
+          assistantMessage?: string | null;
         };
         setBoard(data.board);
         localStorage.removeItem(LOCAL_BOARD_KEY);
 
+        const reply = data.assistantMessage?.trim();
         const assistantMessage: ChatMessage = {
           id: createId("msg"),
           role: "assistant",
-          content: formatOperationsMessage(data.operations || []),
+          content: reply && reply.length > 0
+            ? reply
+            : formatOperationsMessage(data.operations || []),
         };
         setChatMessages((current) => [...current, assistantMessage]);
         return;

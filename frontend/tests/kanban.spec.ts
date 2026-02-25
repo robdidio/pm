@@ -46,3 +46,48 @@ test("moves a card between columns", async ({ page }) => {
   await page.mouse.up();
   await expect(targetColumn.getByTestId("card-card-1")).toBeVisible();
 });
+
+test("chat applies AI updates", async ({ page }) => {
+  await page.route("**/api/ai/board", async (route) => {
+    const body = {
+      schemaVersion: 1,
+      board: {
+        columns: [
+          { id: "col-backlog", title: "Backlog", cardIds: ["card-1"] },
+          { id: "col-discovery", title: "Discovery", cardIds: [] },
+          { id: "col-progress", title: "In Progress", cardIds: [] },
+          { id: "col-review", title: "Review", cardIds: [] },
+          { id: "col-done", title: "Done", cardIds: [] },
+        ],
+        cards: {
+          "card-1": {
+            id: "card-1",
+            title: "AI updated title",
+            details: "Updated via AI",
+          },
+        },
+      },
+      operations: [
+        {
+          type: "update_card",
+          cardId: "card-1",
+          title: "AI updated title",
+          details: "Updated via AI",
+        },
+      ],
+    };
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(body),
+    });
+  });
+
+  await login(page);
+  await page.getByLabel(/ask the ai/i).fill("Update card-1 title");
+  await page.getByRole("button", { name: /send/i }).click();
+
+  await expect(page.getByText("AI updated title")).toBeVisible();
+  await expect(page.getByText(/applied 1 update/i)).toBeVisible();
+});

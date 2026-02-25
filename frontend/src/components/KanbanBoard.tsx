@@ -11,6 +11,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import { AIChatSidebar, type ChatMessage } from "@/components/AIChatSidebar";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
@@ -26,6 +27,10 @@ export const KanbanBoard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isAiSending, setIsAiSending] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -34,6 +39,18 @@ export const KanbanBoard = () => {
   );
 
   const cardsById = useMemo(() => board?.cards ?? {}, [board]);
+
+  const formatOperationsMessage = (operations: Array<{ type: string }>) => {
+    if (operations.length === 0) {
+      return "No changes were applied.";
+    }
+
+    const summary = operations
+      .map((operation) => operation.type.replace(/_/g, " "))
+      .join(", ");
+
+    return `Applied ${operations.length} update(s): ${summary}.`;
+  };
 
   useEffect(() => {
     let isActive = true;
@@ -198,6 +215,66 @@ export const KanbanBoard = () => {
     void persistBoard(nextBoard);
   };
 
+  const handleSendAiPrompt = async () => {
+    const trimmed = chatInput.trim();
+    if (!trimmed || isAiSending) {
+      return;
+    }
+
+    const userMessage: ChatMessage = {
+      id: createId("msg"),
+      role: "user",
+      content: trimmed,
+    };
+
+    const nextMessages = [...chatMessages, userMessage];
+    setChatMessages(nextMessages);
+    setChatInput("");
+    setIsAiSending(true);
+    setChatError(null);
+
+    try {
+      const response = await fetch("/api/ai/board", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: nextMessages.map((message) => ({
+            role: message.role,
+            content: message.content,
+          })),
+        }),
+      });
+
+      if (response.ok) {
+        const data = (await response.json()) as {
+          board: BoardData;
+          operations: Array<{ type: string }>;
+        };
+        setBoard(data.board);
+        localStorage.removeItem(LOCAL_BOARD_KEY);
+
+        const assistantMessage: ChatMessage = {
+          id: createId("msg"),
+          role: "assistant",
+          content: formatOperationsMessage(data.operations || []),
+        };
+        setChatMessages((current) => [...current, assistantMessage]);
+        return;
+      }
+
+      if (response.status === 404) {
+        setChatError("AI service is unavailable in local-only mode.");
+        return;
+      }
+
+      setChatError("Unable to reach the AI service. Please try again.");
+    } catch {
+      setChatError("Unable to reach the AI service. Please try again.");
+    } finally {
+      setIsAiSending(false);
+    }
+  };
+
   const activeCard = activeCardId ? cardsById[activeCardId] : null;
 
   if (isLoading || !board) {
@@ -214,78 +291,91 @@ export const KanbanBoard = () => {
       <div className="pointer-events-none absolute bottom-0 right-0 h-[520px] w-[520px] translate-x-1/4 translate-y-1/4 rounded-full bg-[radial-gradient(circle,_rgba(117,57,145,0.18)_0%,_rgba(117,57,145,0.05)_55%,_transparent_75%)]" />
 
       <main className="relative mx-auto flex min-h-screen max-w-[1500px] flex-col gap-10 px-6 pb-16 pt-12">
-        <header className="flex flex-col gap-4 rounded-[32px] border border-[var(--stroke)] bg-white/80 p-8 shadow-[var(--shadow)] backdrop-blur">
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--gray-text)]">
-                Single Board Kanban
-              </p>
-              <h1 className="mt-3 font-display text-4xl font-semibold text-[var(--navy-dark)]">
-                Kanban Studio
-              </h1>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--gray-text)]">
-                Keep momentum visible. Rename columns, drag cards between stages,
-                and capture quick notes without getting buried in settings.
-              </p>
-              {isSaving ? (
-                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--primary-blue)]">
-                  Saving changes...
-                </p>
-              ) : null}
-              {errorMessage ? (
-                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--secondary-purple)]">
-                  {errorMessage}
-                </p>
-              ) : null}
-            </div>
-            <div className="rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--gray-text)]">
-                Focus
-              </p>
-              <p className="mt-2 text-lg font-semibold text-[var(--primary-blue)]">
-                One board. Five columns. Zero clutter.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-4">
-            {board.columns.map((column) => (
-              <div
-                key={column.id}
-                className="flex items-center gap-2 rounded-full border border-[var(--stroke)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--navy-dark)]"
-              >
-                <span className="h-2 w-2 rounded-full bg-[var(--accent-yellow)]" />
-                {column.title}
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="flex flex-col gap-10">
+            <header className="flex flex-col gap-4 rounded-[32px] border border-[var(--stroke)] bg-white/80 p-8 shadow-[var(--shadow)] backdrop-blur">
+              <div className="flex flex-wrap items-start justify-between gap-6">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--gray-text)]">
+                    Single Board Kanban
+                  </p>
+                  <h1 className="mt-3 font-display text-4xl font-semibold text-[var(--navy-dark)]">
+                    Kanban Studio
+                  </h1>
+                  <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--gray-text)]">
+                    Keep momentum visible. Rename columns, drag cards between stages,
+                    and capture quick notes without getting buried in settings.
+                  </p>
+                  {isSaving ? (
+                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--primary-blue)]">
+                      Saving changes...
+                    </p>
+                  ) : null}
+                  {errorMessage ? (
+                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--secondary-purple)]">
+                      {errorMessage}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-5 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--gray-text)]">
+                    Focus
+                  </p>
+                  <p className="mt-2 text-lg font-semibold text-[var(--primary-blue)]">
+                    One board. Five columns. Zero clutter.
+                  </p>
+                </div>
               </div>
-            ))}
-          </div>
-        </header>
+              <div className="flex flex-wrap items-center gap-4">
+                {board.columns.map((column) => (
+                  <div
+                    key={column.id}
+                    className="flex items-center gap-2 rounded-full border border-[var(--stroke)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--navy-dark)]"
+                  >
+                    <span className="h-2 w-2 rounded-full bg-[var(--accent-yellow)]" />
+                    {column.title}
+                  </div>
+                ))}
+              </div>
+            </header>
 
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <section className="grid gap-6 lg:grid-cols-5">
-            {board.columns.map((column) => (
-              <KanbanColumn
-                key={column.id}
-                column={column}
-                cards={column.cardIds.map((cardId) => board.cards[cardId])}
-                onRename={handleRenameColumn}
-                onAddCard={handleAddCard}
-                onDeleteCard={handleDeleteCard}
-              />
-            ))}
-          </section>
-          <DragOverlay>
-            {activeCard ? (
-              <div className="w-[260px]">
-                <KanbanCardPreview card={activeCard} />
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCorners}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <section className="grid gap-6 lg:grid-cols-5">
+                {board.columns.map((column) => (
+                  <KanbanColumn
+                    key={column.id}
+                    column={column}
+                    cards={column.cardIds.map((cardId) => board.cards[cardId])}
+                    onRename={handleRenameColumn}
+                    onAddCard={handleAddCard}
+                    onDeleteCard={handleDeleteCard}
+                  />
+                ))}
+              </section>
+              <DragOverlay>
+                {activeCard ? (
+                  <div className="w-[260px]">
+                    <KanbanCardPreview card={activeCard} />
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          </div>
+
+          <AIChatSidebar
+            messages={chatMessages}
+            input={chatInput}
+            isSending={isAiSending}
+            errorMessage={chatError}
+            onInputChange={setChatInput}
+            onSend={handleSendAiPrompt}
+          />
+        </div>
       </main>
     </div>
   );

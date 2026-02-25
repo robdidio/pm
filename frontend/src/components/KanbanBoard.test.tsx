@@ -16,8 +16,34 @@ const mockJsonResponse = (payload: unknown, status = 200) =>
 
 beforeEach(() => {
   mockFetch.mockImplementation((input: RequestInfo, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.url;
     if (!init || init.method === "GET") {
       return mockJsonResponse(initialData);
+    }
+
+    if (init.method === "POST" && url.includes("/api/ai/board")) {
+      const aiBoard = {
+        ...initialData,
+        cards: {
+          ...initialData.cards,
+          "card-1": {
+            ...initialData.cards["card-1"],
+            title: "AI updated title",
+          },
+        },
+      };
+      return mockJsonResponse({
+        schemaVersion: 1,
+        board: aiBoard,
+        operations: [
+          {
+            type: "update_card",
+            cardId: "card-1",
+            title: "AI updated title",
+            details: aiBoard.cards["card-1"].details,
+          },
+        ],
+      });
     }
 
     if (init.method === "PUT" && typeof init.body === "string") {
@@ -72,5 +98,22 @@ describe("KanbanBoard", () => {
     await userEvent.click(deleteButton);
 
     expect(within(column).queryByText("New card")).not.toBeInTheDocument();
+  });
+
+  it("sends an AI prompt and applies updates", async () => {
+    render(<KanbanBoard />);
+
+    await screen.findAllByTestId(/column-/i);
+
+    await userEvent.type(
+      screen.getByLabelText(/ask the ai/i),
+      "Update card-1"
+    );
+    await userEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    expect(
+      await screen.findByText(/applied 1 update/i)
+    ).toBeInTheDocument();
+    expect(await screen.findByText("AI updated title")).toBeInTheDocument();
   });
 });

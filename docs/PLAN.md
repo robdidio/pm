@@ -179,33 +179,33 @@ Success criteria:
 Goal: Provide board context to the AI and accept structured updates.
 
 Checklist:
-- [ ] Define structured output schema for AI responses.
-- [ ] Include board JSON + conversation history in prompts.
-- [ ] Validate and apply AI-suggested board updates.
+- [x] Define structured output schema for AI responses.
+- [x] Include board JSON + conversation history in prompts.
+- [x] Validate and apply AI-suggested board updates.
 - [ ] User review and approval.
 
 Tests:
-- [ ] Backend tests for schema validation and safe update application.
-- [ ] Mocked AI responses in unit tests.
+- [x] Backend tests for schema validation and safe update application.
+- [x] Mocked AI responses in unit tests.
 
 Success criteria:
-- [ ] AI responses are validated and deterministic to apply.
-- [ ] Invalid AI responses do not break the board.
+- [x] AI responses are validated and deterministic to apply.
+- [x] Invalid AI responses do not break the board.
 
 ## Part 10: AI chat sidebar UX
 
 Goal: Add AI chat UI that can update the board from structured outputs.
 
 Checklist:
-- [ ] Build sidebar chat UI with message history.
-- [ ] Wire chat to backend AI endpoint.
-- [ ] Apply structured output updates to the board and refresh UI.
-- [ ] User review and approval.
+- [x] Build sidebar chat UI with message history.
+- [x] Wire chat to backend AI endpoint.
+- [x] Apply structured output updates to the board and refresh UI.
+- [x] User review and approval.
 
 Tests:
-- [ ] Frontend unit tests for chat state and rendering.
-- [ ] E2E tests for chat prompt and board update flow.
+- [x] Frontend unit tests for chat state and rendering.
+- [x] E2E tests for chat prompt and board update flow.
 
 Success criteria:
-- [ ] Chat works end to end with board updates.
-- [ ] UI remains responsive and consistent after AI changes.
+- [x] Chat works end to end with board updates.
+- [x] UI remains responsive and consistent after AI changes.

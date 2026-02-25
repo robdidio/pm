@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
 import json
 from typing import Annotated, Any, Literal, Union
@@ -7,9 +8,11 @@ import os
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 import httpx
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import AliasChoices, BaseModel, Field, ValidationError
 
 from app import db
+
+logger = logging.getLogger("pm.ai")
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -79,8 +82,8 @@ class AiOperationUpdateCard(BaseModel):
 class AiOperationMoveCard(BaseModel):
     type: Literal["move_card"]
     cardId: str
-    columnId: str
-    position: int
+    columnId: str = Field(validation_alias=AliasChoices("columnId", "toColumnId"))
+    position: int | None = None
 
 
 class AiOperationDeleteCard(BaseModel):
@@ -142,6 +145,7 @@ def call_openrouter_messages(messages: list[dict[str, str]]) -> str:
     payload = {
         "model": OPENROUTER_MODEL,
         "temperature": 0,
+        "response_format": {"type": "json_object"},
         "messages": messages,
     }
     headers = {
@@ -236,11 +240,15 @@ def build_ai_system_prompt(board: dict[str, Any]) -> str:
 
     return (
         "You are a project management assistant. "
-        "Return JSON only, no markdown or extra text. "
-        "The response must include a full board replacement and an operations list. "
+        "Return a single JSON object only, no markdown or extra text. "
+        "Return exactly this schema with double-quoted keys: "
+        "{schemaVersion:1, board:{columns:[{id,title,cardIds}], cards:{[id]:{id,title,details}}}, operations:[...]} "
+        "Include a full board replacement and an operations list. "
+        "If no changes are needed, return the current board and an empty operations array. "
         "Use schemaVersion 1. "
         "Use unique string ids; for new cards prefer 'card-' prefix. "
         "Operations types: create_card, update_card, move_card, delete_card, rename_column. "
+        "Ensure every cardId in columns exists in cards. "
         f"Schema example: {schema_json} "
         f"Board context: {board_json}"
     )
@@ -262,6 +270,7 @@ def parse_ai_board_response(raw: str) -> AiBoardResponse:
     try:
         parsed = AiBoardResponse.model_validate(data)
     except ValidationError as exc:
+        logger.warning("OpenRouter invalid schema response: %s", raw)
         raise HTTPException(status_code=502, detail="openrouter_invalid_schema") from exc
 
     if parsed.schemaVersion != 1:

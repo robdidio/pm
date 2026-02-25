@@ -8,6 +8,7 @@ import {
   useSensor,
   useSensors,
   closestCorners,
+  pointerWithin,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -37,6 +38,14 @@ export const KanbanBoard = () => {
       activationConstraint: { distance: 6 },
     })
   );
+
+  const collisionDetectionStrategy = (args: Parameters<typeof closestCorners>[0]) => {
+    const pointerCollisions = pointerWithin(args);
+    if (pointerCollisions.length > 0) {
+      return pointerCollisions;
+    }
+    return closestCorners(args);
+  };
 
   const cardsById = useMemo(() => board?.cards ?? {}, [board]);
 
@@ -266,6 +275,29 @@ export const KanbanBoard = () => {
         setChatError("AI service is unavailable in local-only mode.");
         return;
       }
+      let detailMessage: string | null = null;
+      try {
+        const errorPayload = (await response.json()) as { detail?: string };
+        detailMessage = errorPayload.detail ?? null;
+      } catch {
+        detailMessage = null;
+      }
+
+      if (detailMessage === "openrouter_invalid_schema") {
+        setChatError("AI response did not match the required schema. Try again.");
+        return;
+      }
+
+      if (detailMessage === "openrouter_invalid_json") {
+        setChatError("AI response was not valid JSON. Try again.");
+        return;
+      }
+
+      if (detailMessage?.startsWith("openrouter_error:")) {
+        const status = detailMessage.split(":")[1] ?? "unknown";
+        setChatError(`AI service returned an error (${status}). Try again.`);
+        return;
+      }
 
       setChatError("Unable to reach the AI service. Please try again.");
     } catch {
@@ -341,7 +373,7 @@ export const KanbanBoard = () => {
 
             <DndContext
               sensors={sensors}
-              collisionDetection={closestCorners}
+              collisionDetection={collisionDetectionStrategy}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
             >

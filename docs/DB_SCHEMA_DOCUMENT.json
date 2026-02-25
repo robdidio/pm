@@ -1,0 +1,47 @@
+{
+  "schema": "document",
+  "version": 1,
+  "document": {
+    "board": {
+      "id": "board-1",
+      "userId": "user-1",
+      "title": "My Board",
+      "createdAt": "2026-02-24T00:00:00Z",
+      "updatedAt": "2026-02-24T00:00:00Z",
+      "columns": [
+        {
+          "id": "col-backlog",
+          "title": "Backlog",
+          "position": 0,
+          "cardIds": ["card-1", "card-2"]
+        },
+        {
+          "id": "col-discovery",
+          "title": "Discovery",
+          "position": 1,
+          "cardIds": ["card-3"]
+        }
+      ],
+      "cards": {
+        "card-1": {
+          "id": "card-1",
+          "columnId": "col-backlog",
+          "title": "Align roadmap themes",
+          "details": "Draft quarterly themes with impact statements and metrics.",
+          "position": 0,
+          "createdAt": "2026-02-24T00:00:00Z",
+          "updatedAt": "2026-02-24T00:00:00Z"
+        },
+        "card-2": {
+          "id": "card-2",
+          "columnId": "col-backlog",
+          "title": "Gather customer signals",
+          "details": "Review support tags, sales notes, and churn feedback.",
+          "position": 1,
+          "createdAt": "2026-02-24T00:00:00Z",
+          "updatedAt": "2026-02-24T00:00:00Z"
+        }
+      }
+    }
+  }
+}

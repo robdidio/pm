@@ -1,0 +1,67 @@
+{
+  "schema": "relational",
+  "version": 1,
+  "tables": [
+    {
+      "name": "users",
+      "columns": [
+        {"name": "id", "type": "integer", "primaryKey": true, "autoIncrement": true},
+        {"name": "username", "type": "text", "unique": true, "nullable": false},
+        {"name": "created_at", "type": "text", "nullable": false}
+      ]
+    },
+    {
+      "name": "boards",
+      "columns": [
+        {"name": "id", "type": "integer", "primaryKey": true, "autoIncrement": true},
+        {"name": "user_id", "type": "integer", "nullable": false},
+        {"name": "title", "type": "text", "nullable": false},
+        {"name": "created_at", "type": "text", "nullable": false},
+        {"name": "updated_at", "type": "text", "nullable": false}
+      ],
+      "foreignKeys": [
+        {"column": "user_id", "references": "users.id", "onDelete": "cascade"}
+      ],
+      "indexes": [
+        {"name": "idx_boards_user_id", "columns": ["user_id"]}
+      ]
+    },
+    {
+      "name": "columns",
+      "columns": [
+        {"name": "id", "type": "integer", "primaryKey": true, "autoIncrement": true},
+        {"name": "board_id", "type": "integer", "nullable": false},
+        {"name": "title", "type": "text", "nullable": false},
+        {"name": "position", "type": "integer", "nullable": false}
+      ],
+      "foreignKeys": [
+        {"column": "board_id", "references": "boards.id", "onDelete": "cascade"}
+      ],
+      "indexes": [
+        {"name": "idx_columns_board_id", "columns": ["board_id"]},
+        {"name": "idx_columns_board_position", "columns": ["board_id", "position"]}
+      ]
+    },
+    {
+      "name": "cards",
+      "columns": [
+        {"name": "id", "type": "integer", "primaryKey": true, "autoIncrement": true},
+        {"name": "board_id", "type": "integer", "nullable": false},
+        {"name": "column_id", "type": "integer", "nullable": false},
+        {"name": "title", "type": "text", "nullable": false},
+        {"name": "details", "type": "text", "nullable": false},
+        {"name": "position", "type": "integer", "nullable": false},
+        {"name": "created_at", "type": "text", "nullable": false},
+        {"name": "updated_at", "type": "text", "nullable": false}
+      ],
+      "foreignKeys": [
+        {"column": "board_id", "references": "boards.id", "onDelete": "cascade"},
+        {"column": "column_id", "references": "columns.id", "onDelete": "cascade"}
+      ],
+      "indexes": [
+        {"name": "idx_cards_board_id", "columns": ["board_id"]},
+        {"name": "idx_cards_column_position", "columns": ["column_id", "position"]}
+      ]
+    }
+  ]
+}

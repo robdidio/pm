@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PM Backend</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Arial, sans-serif;
+        margin: 40px;
+        color: #032147;
+        background: #f7f8fb;
+      }
+      .card {
+        background: #ffffff;
+        border: 1px solid rgba(3, 33, 71, 0.08);
+        border-radius: 16px;
+        box-shadow: 0 18px 40px rgba(3, 33, 71, 0.12);
+        padding: 24px;
+        max-width: 520px;
+      }
+      h1 {
+        margin: 0 0 12px;
+      }
+      code {
+        background: #f0f3f9;
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Backend online</h1>
+      <p>Static HTML is served from FastAPI at <code>/</code>.</p>
+      <p>API health: <span id="status">checking...</span></p>
+    </div>
+    <script>
+      fetch("/api/health")
+        .then((response) => response.json())
+        .then((payload) => {
+          document.getElementById("status").textContent = payload.status;
+        })
+        .catch(() => {
+          document.getElementById("status").textContent = "unavailable";
+        });
+    </script>
+  </body>
+</html>

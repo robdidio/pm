@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+node_modules
+**/node_modules
+frontend/.next
+frontend/out
+frontend/test-results
+frontend/.cache
+__pycache__
+**/__pycache__
+*.pyc
+.vscode

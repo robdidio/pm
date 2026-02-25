@@ -5,6 +5,7 @@ import os
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
+import httpx
 from pydantic import BaseModel
 
 from app import db
@@ -20,6 +21,8 @@ app = FastAPI(lifespan=lifespan)
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 DEFAULT_DB_PATH = Path("/app/data/pm.db")
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODEL = "openai/gpt-oss-120b"
 
 AUTH_COOKIE_NAME = "pm_session"
 AUTH_COOKIE_VALUE = "authenticated"
@@ -65,6 +68,40 @@ def get_db_path() -> Path:
     if env_path:
         return Path(env_path)
     return DEFAULT_DB_PATH
+
+
+def get_openrouter_key() -> str:
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="missing_openrouter_key")
+    return api_key
+
+
+def call_openrouter(prompt: str) -> str:
+    api_key = get_openrouter_key()
+    payload = {
+        "model": OPENROUTER_MODEL,
+        "temperature": 0,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    with httpx.Client(timeout=20) as client:
+        response = client.post(OPENROUTER_URL, json=payload, headers=headers)
+
+    if response.status_code >= 400:
+        raise HTTPException(
+            status_code=502, detail=f"openrouter_error:{response.status_code}"
+        )
+
+    data = response.json()
+    message = data.get("choices", [{}])[0].get("message", {}).get("content")
+    if not message:
+        raise HTTPException(status_code=502, detail="openrouter_empty_response")
+    return message
 
 
 @app.get("/api/health")
@@ -148,6 +185,13 @@ def update_board(payload: BoardPayload, request: Request) -> dict[str, Any]:
     with db.get_connection(get_db_path()) as conn:
         db.replace_board(conn, db.DEFAULT_BOARD_ID, column_inputs, card_inputs)
         return db.fetch_board(conn, db.DEFAULT_BOARD_ID)
+
+
+@app.post("/api/ai/test")
+def ai_test(request: Request) -> dict[str, str]:
+    require_auth(request)
+    response = call_openrouter("What is 2+2? Respond with a single number.")
+    return {"response": response}
 
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

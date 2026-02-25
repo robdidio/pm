@@ -1,18 +1,46 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { KanbanBoard } from "@/components/KanbanBoard";
+import { initialData } from "@/lib/kanban";
+import { vi } from "vitest";
 
-const getFirstColumn = () => screen.getAllByTestId(/column-/i)[0];
+const mockFetch = vi.fn();
+
+const mockJsonResponse = (payload: unknown, status = 200) =>
+  Promise.resolve(
+    new Response(JSON.stringify(payload), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    })
+  );
+
+beforeEach(() => {
+  mockFetch.mockImplementation((input: RequestInfo, init?: RequestInit) => {
+    if (!init || init.method === "GET") {
+      return mockJsonResponse(initialData);
+    }
+
+    if (init.method === "PUT" && typeof init.body === "string") {
+      return mockJsonResponse(JSON.parse(init.body));
+    }
+
+    return mockJsonResponse(initialData);
+  });
+  global.fetch = mockFetch as unknown as typeof fetch;
+});
 
 describe("KanbanBoard", () => {
-  it("renders five columns", () => {
+  it("renders five columns", async () => {
     render(<KanbanBoard />);
-    expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+    const columns = await screen.findAllByTestId(/column-/i);
+    expect(columns).toHaveLength(5);
   });
 
   it("renames a column", async () => {
     render(<KanbanBoard />);
-    const column = getFirstColumn();
+    const column = await screen.findAllByTestId(/column-/i).then(
+      (columns) => columns[0]
+    );
     const input = within(column).getByLabelText("Column title");
     await userEvent.clear(input);
     await userEvent.type(input, "New Name");
@@ -21,7 +49,9 @@ describe("KanbanBoard", () => {
 
   it("adds and removes a card", async () => {
     render(<KanbanBoard />);
-    const column = getFirstColumn();
+    const column = await screen.findAllByTestId(/column-/i).then(
+      (columns) => columns[0]
+    );
     const addButton = within(column).getByRole("button", {
       name: /add a card/i,
     });

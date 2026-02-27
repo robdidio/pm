@@ -16,7 +16,7 @@ class CardPayload(BaseModel):
 
 class ColumnPayload(BaseModel):
     id: str
-    title: str
+    title: str = Field(max_length=100)
     cardIds: list[str]
 
 

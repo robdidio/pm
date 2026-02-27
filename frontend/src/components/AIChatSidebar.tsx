@@ -60,7 +60,7 @@ export const AIChatSidebar = ({
         <div className="flex h-full flex-col gap-3 overflow-y-auto pr-1">
           {messages.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-[var(--stroke)] bg-[var(--surface)] p-4 text-sm text-[var(--gray-text)]">
-              No messages yet. Start with something like "Move card-1 to Done.".
+              No messages yet. Start with something like &quot;Move card-1 to Done&quot;.
             </div>
           ) : null}
           {messages.map((message, index) => (

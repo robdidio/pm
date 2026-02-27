@@ -87,21 +87,23 @@ def build_ai_system_prompt(board: dict[str, Any]) -> str:
     return (
         "You are a project management assistant. "
         "Return a single JSON object only, no markdown or extra text. "
+        "CRITICAL: Use the EXACT column and card IDs from the board context below - do NOT invent new IDs. "
         "Return exactly this schema with double-quoted keys: "
-        "{schemaVersion:1, board:{columns:[{id,title,cardIds}], cards:{[id]:{id,title,details}}}, operations:[...]} "
+        '{"schemaVersion": 1, "board": {"columns": [{"id": "col-xxx", "title": "Name", "cardIds": ["card-yyy"]}], "cards": {"card-yyy": {"id": "card-yyy", "title": "Name", "details": "Text"}}}, "operations": [...], "assistantMessage": "..."} '
         "Include a full board replacement and an operations list. "
         "If no changes are needed, return the current board and an empty operations array. "
         "If the user asks for a summary or non-board update, you MUST include assistantMessage with the reply,"
         " keep the board unchanged, and set operations to an empty array. "
         "Use schemaVersion 1. "
-        "Use unique string ids; for new cards prefer 'card-' prefix. "
         "Operation field names (use exactly these): "
-        "create_card(card, columnId, position), "
+        "create_card(card: {id, title, details}, columnId, position), "
         "update_card(cardId, title, details), "
         "move_card(cardId, columnId, position), "
         "delete_card(cardId), "
         "rename_column(columnId, title). "
-        "Ensure every cardId in columns exists in cards. "
+        "IMPORTANT: The cards object must have BOTH the id key and the card-id as dictionary key for each card. "
+        "Example card entry: 'card-1': {'id': 'card-1', 'title': 'My card', 'details': 'Description'} "
+        "Ensure every cardId in columns.cardIds exists in cards as a dictionary key. "
         f"Schema example: {schema_json} "
         f"Summary example: {summary_json} "
         f"Board context: {board_json}"
@@ -140,6 +142,7 @@ def build_board_summary(board: BoardPayload) -> str:
 
 
 def parse_ai_board_response(raw: str) -> AiBoardResponse:
+    logger.debug("AI raw response: %s", raw[:2000])
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
@@ -152,10 +155,32 @@ def parse_ai_board_response(raw: str) -> AiBoardResponse:
         except json.JSONDecodeError as exc:
             raise HTTPException(status_code=502, detail="openrouter_invalid_json") from exc
 
+    if "board" not in data:
+        logger.warning("AI response missing 'board' key")
+        raise HTTPException(status_code=502, detail="openrouter_invalid_schema")
+    
+    if "columns" not in data.get("board", {}):
+        logger.warning("AI response missing 'board.columns'")
+        raise HTTPException(status_code=502, detail="openrouter_invalid_schema")
+    
+    if "cards" not in data.get("board", {}):
+        logger.warning("AI response missing 'board.cards'")
+        raise HTTPException(status_code=502, detail="openrouter_invalid_schema")
+    
+    cards = data.get("board", {}).get("cards", {})
+    for card_id, card_data in cards.items():
+        if not isinstance(card_data, dict):
+            logger.warning("AI response: card %s is not a dict", card_id)
+            raise HTTPException(status_code=502, detail="openrouter_invalid_schema")
+        if "id" not in card_data:
+            logger.warning("AI response: card %s missing 'id' field", card_id)
+            raise HTTPException(status_code=502, detail="openrouter_invalid_schema")
+
     try:
         parsed = AiBoardResponse.model_validate(data)
     except ValidationError as exc:
-        logger.warning("OpenRouter invalid schema response: %s", raw)
+        logger.warning("OpenRouter invalid schema response: %s", raw[:500])
+        logger.warning("Validation error: %s", exc)
         raise HTTPException(status_code=502, detail="openrouter_invalid_schema") from exc
 
     if parsed.schemaVersion != 1:

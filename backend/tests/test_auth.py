@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
-from app.main import AUTH_COOKIE_NAME, app
+from app.auth import AUTH_COOKIE_NAME
+from app.main import app
 
 
 def test_auth_status_unauthenticated() -> None:

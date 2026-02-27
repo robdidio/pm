@@ -1,12 +1,11 @@
 import json
-import os
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app import db
-import app.main as main_module
+import app.routes.ai as routes_ai
 from app.main import app
 
 
@@ -23,25 +22,6 @@ def login(client: TestClient) -> None:
     )
     assert response.status_code == 200
 
-
-@pytest.mark.skipif(
-    not os.environ.get("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY is not set",
-)
-def test_ai_test_endpoint() -> None:
-    client = TestClient(app)
-    login = client.post(
-        "/api/auth/login",
-        json={"username": "user", "password": "password"},
-    )
-    assert login.status_code == 200
-
-    response = client.post("/api/ai/test")
-    assert response.status_code == 200
-    payload = response.json()
-
-    assert "response" in payload
-    assert "4" in payload["response"]
 
 
 def test_ai_board_endpoint_applies_update(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -76,7 +56,7 @@ def test_ai_board_endpoint_applies_update(tmp_path: Path, monkeypatch: pytest.Mo
     def fake_call_openrouter_messages(_: list[dict[str, str]]) -> str:
         return json.dumps(ai_payload)
 
-    monkeypatch.setattr(main_module, "call_openrouter_messages", fake_call_openrouter_messages)
+    monkeypatch.setattr(routes_ai, "call_openrouter_messages", fake_call_openrouter_messages)
 
     response = client.post(
         "/api/ai/board",
@@ -99,7 +79,7 @@ def test_ai_board_rejects_invalid_schema(tmp_path: Path, monkeypatch: pytest.Mon
     def fake_call_openrouter_messages(_: list[dict[str, str]]) -> str:
         return json.dumps({"schemaVersion": 1, "board": {"columns": [], "cards": {}}})
 
-    monkeypatch.setattr(main_module, "call_openrouter_messages", fake_call_openrouter_messages)
+    monkeypatch.setattr(routes_ai, "call_openrouter_messages", fake_call_openrouter_messages)
 
     response = client.post(
         "/api/ai/board",
@@ -118,7 +98,7 @@ def test_ai_board_summary_bypasses_ai(tmp_path: Path, monkeypatch: pytest.Monkey
     def fake_call_openrouter_messages(_: list[dict[str, str]]) -> str:
         raise AssertionError("AI should not be called for summaries")
 
-    monkeypatch.setattr(main_module, "call_openrouter_messages", fake_call_openrouter_messages)
+    monkeypatch.setattr(routes_ai, "call_openrouter_messages", fake_call_openrouter_messages)
 
     response = client.post(
         "/api/ai/board",

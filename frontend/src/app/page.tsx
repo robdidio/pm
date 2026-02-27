@@ -6,10 +6,6 @@ import { LoginPanel } from "@/components/LoginPanel";
 
 type AuthState = "checking" | "authenticated" | "unauthenticated";
 
-const LOCAL_AUTH_KEY = "pm_local_auth";
-const DEMO_USERNAME = "user";
-const DEMO_PASSWORD = "password";
-
 export default function Home() {
   const [authState, setAuthState] = useState<AuthState>("checking");
 
@@ -19,24 +15,16 @@ export default function Home() {
     const checkAuth = async () => {
       try {
         const response = await fetch("/api/auth/status");
-        if (response.ok) {
-          const data = await response.json();
-          if (isActive) {
-            setAuthState(
-              data.authenticated ? "authenticated" : "unauthenticated"
-            );
-          }
-          return;
-        }
-
-        if (response.status === 404 && isActive) {
-          const localAuth = localStorage.getItem(LOCAL_AUTH_KEY) === "true";
-          setAuthState(localAuth ? "authenticated" : "unauthenticated");
+        if (isActive) {
+          setAuthState(
+            response.ok && (await response.json()).authenticated
+              ? "authenticated"
+              : "unauthenticated"
+          );
         }
       } catch {
         if (isActive) {
-          const localAuth = localStorage.getItem(LOCAL_AUTH_KEY) === "true";
-          setAuthState(localAuth ? "authenticated" : "unauthenticated");
+          setAuthState("unauthenticated");
         }
       }
     };
@@ -49,36 +37,34 @@ export default function Home() {
   }, []);
 
   const handleLogin = async (username: string, password: string) => {
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
 
-    if (response.ok) {
-      localStorage.removeItem(LOCAL_AUTH_KEY);
-      setAuthState("authenticated");
-      return null;
-    }
-
-    if (response.status === 404) {
-      if (username === DEMO_USERNAME && password === DEMO_PASSWORD) {
-        localStorage.setItem(LOCAL_AUTH_KEY, "true");
+      if (response.ok) {
         setAuthState("authenticated");
         return null;
       }
-    }
 
-    return "Invalid username or password.";
+      if (response.status === 401) {
+        return "Invalid username or password.";
+      }
+
+      return "Unable to reach the server. Please try again.";
+    } catch {
+      return "Unable to reach the server. Please try again.";
+    }
   };
 
   const handleLogout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } catch {
-      // Ignore network failures; local session will still be cleared.
+      // Ignore network failures; cookie will have been cleared by the server already.
     }
-    localStorage.removeItem(LOCAL_AUTH_KEY);
     setAuthState("unauthenticated");
   };
 

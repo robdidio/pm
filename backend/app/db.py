@@ -251,6 +251,14 @@ def replace_board(
     columns: Iterable[ColumnInput],
     cards: Iterable[CardInput],
 ) -> None:
+    # Preserve creation timestamps so they survive full-board replacements.
+    existing_created: dict[str, str] = {
+        row["id"]: row["created_at"]
+        for row in conn.execute(
+            "SELECT id, created_at FROM cards WHERE board_id = ?", (board_id,)
+        ).fetchall()
+    }
+
     conn.execute("DELETE FROM cards WHERE board_id = ?", (board_id,))
     conn.execute("DELETE FROM columns WHERE board_id = ?", (board_id,))
 
@@ -262,6 +270,7 @@ def replace_board(
 
     now = utc_now()
     for card in cards:
+        created_at = existing_created.get(card.id, now)
         conn.execute(
             """
             INSERT INTO cards (id, board_id, column_id, title, details, position, created_at, updated_at)
@@ -274,7 +283,7 @@ def replace_board(
                 card.title,
                 card.details,
                 card.position,
-                now,
+                created_at,
                 now,
             ),
         )

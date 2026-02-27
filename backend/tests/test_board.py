@@ -42,6 +42,47 @@ def test_get_board_returns_seed(tmp_path: Path) -> None:
     assert len(payload["columns"]) == 5
 
 
+def test_update_board_missing_card_returns_generic_error(tmp_path: Path) -> None:
+    setup_test_db(tmp_path)
+    client = TestClient(app)
+    login(client)
+
+    payload = {
+        "columns": [{"id": "col-1", "title": "Todo", "cardIds": ["card-missing"]}],
+        "cards": {},
+    }
+    response = client.put("/api/board", json=payload)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "invalid_board"
+
+
+def test_update_board_unused_card_returns_generic_error(tmp_path: Path) -> None:
+    setup_test_db(tmp_path)
+    client = TestClient(app)
+    login(client)
+
+    payload = {
+        "columns": [{"id": "col-1", "title": "Todo", "cardIds": []}],
+        "cards": {"card-1": {"id": "card-1", "title": "Orphan", "details": "No column"}},
+    }
+    response = client.put("/api/board", json=payload)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "invalid_board"
+
+
+def test_update_board_title_too_long_returns_422(tmp_path: Path) -> None:
+    setup_test_db(tmp_path)
+    client = TestClient(app)
+    login(client)
+
+    payload = {
+        "columns": [{"id": "col-1", "title": "Todo", "cardIds": ["card-1"]}],
+        "cards": {"card-1": {"id": "card-1", "title": "x" * 201, "details": "ok"}},
+    }
+    response = client.put("/api/board", json=payload)
+    assert response.status_code == 422
+
+
 def test_update_board(tmp_path: Path) -> None:
     setup_test_db(tmp_path)
     client = TestClient(app)

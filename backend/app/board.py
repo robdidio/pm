@@ -1,7 +1,11 @@
+import logging
+
 from fastapi import HTTPException
 
 from app import db
 from app.models import BoardPayload
+
+logger = logging.getLogger("pm.board")
 
 
 def build_board_inputs(
@@ -23,10 +27,8 @@ def build_board_inputs(
 
         for position, card_id in enumerate(column.cardIds):
             if card_id not in card_ids:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"missing_card:{card_id}",
-                )
+                logger.warning("Board validation failed: card %r in column %r not found in cards dict", card_id, column.id)
+                raise HTTPException(status_code=400, detail="invalid_board")
             card = payload.cards[card_id]
             card_inputs.append(
                 db.CardInput(
@@ -40,6 +42,7 @@ def build_board_inputs(
 
     if len(card_inputs) != len(card_ids):
         extra_cards = sorted(card_ids - {card.id for card in card_inputs})
-        raise HTTPException(status_code=400, detail=f"unused_cards:{extra_cards}")
+        logger.warning("Board validation failed: cards in payload not referenced by any column: %r", extra_cards)
+        raise HTTPException(status_code=400, detail="invalid_board")
 
     return column_inputs, card_inputs

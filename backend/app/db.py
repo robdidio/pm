@@ -32,6 +32,8 @@ DEFAULT_USER_ID = "user"
 DEFAULT_BOARD_ID = "board-1"
 DEFAULT_BOARD_TITLE = "My Board"
 
+# NOTE: This seed data mirrors frontend/src/lib/kanban.ts initialData.
+# If you change cards or columns here, update kanban.ts to match.
 DEFAULT_COLUMNS = [
     ColumnInput("col-backlog", "Backlog", 0, ["card-1", "card-2"]),
     ColumnInput("col-discovery", "Discovery", 1, ["card-3"]),

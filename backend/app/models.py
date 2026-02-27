@@ -10,8 +10,8 @@ class LoginRequest(BaseModel):
 
 class CardPayload(BaseModel):
     id: str
-    title: str
-    details: str
+    title: str = Field(max_length=200)
+    details: str = Field(max_length=10_000)
 
 
 class ColumnPayload(BaseModel):

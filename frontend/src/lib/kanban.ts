@@ -15,6 +15,8 @@ export type BoardData = {
   cards: Record<string, Card>;
 };
 
+// NOTE: This initial data mirrors backend/app/db.py DEFAULT_COLUMNS and DEFAULT_CARDS.
+// If you change cards or columns here, update db.py to match.
 export const initialData: BoardData = {
   columns: [
     { id: "col-backlog", title: "Backlog", cardIds: ["card-1", "card-2"] },

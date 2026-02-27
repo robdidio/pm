@@ -9,6 +9,16 @@ import app.routes.ai as routes_ai
 from app.main import app
 
 
+MINIMAL_AI_PAYLOAD = {
+    "schemaVersion": 1,
+    "board": {
+        "columns": [{"id": "col-1", "title": "Todo", "cardIds": ["card-1"]}],
+        "cards": {"card-1": {"id": "card-1", "title": "A card", "details": "Details"}},
+    },
+    "operations": [],
+}
+
+
 def setup_test_db(tmp_path: Path) -> None:
     db_path = tmp_path / "test.db"
     app.state.db_path = db_path
@@ -130,6 +140,34 @@ def test_ai_board_move_card_with_toColumnId(tmp_path: Path, monkeypatch: pytest.
     assert payload["operations"][0]["type"] == "move_card"
     done_col = next(c for c in payload["board"]["columns"] if c["id"] == "col-2")
     assert "card-1" in done_col["cardIds"]
+
+
+def test_ai_board_rate_limit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    setup_test_db(tmp_path)
+    client = TestClient(app)
+    login(client)
+
+    monkeypatch.setattr(routes_ai, "AI_RATE_LIMIT", 1)
+    monkeypatch.setattr(routes_ai, "_ai_request_times", {})
+
+    monkeypatch.setattr(
+        routes_ai,
+        "call_openrouter_messages",
+        lambda _: json.dumps(MINIMAL_AI_PAYLOAD),
+    )
+
+    first = client.post(
+        "/api/ai/board",
+        json={"messages": [{"role": "user", "content": "Do something"}]},
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/api/ai/board",
+        json={"messages": [{"role": "user", "content": "Do something again"}]},
+    )
+    assert second.status_code == 429
+    assert second.json()["detail"] == "rate_limit_exceeded"
 
 
 def test_ai_board_summary_bypasses_ai(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

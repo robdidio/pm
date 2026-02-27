@@ -21,7 +21,6 @@ def build_board_inputs(
                 id=column.id,
                 title=column.title,
                 position=index,
-                card_ids=list(column.cardIds),
             )
         )
 

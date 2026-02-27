@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -7,6 +8,8 @@ from app.auth import require_auth
 from app.board import build_board_inputs
 from app.config import get_db_path
 from app.models import BoardPayload
+
+logger = logging.getLogger("pm.board")
 
 router = APIRouter()
 
@@ -25,4 +28,6 @@ def update_board(payload: BoardPayload, request: Request) -> dict[str, Any]:
 
     with db.get_connection(get_db_path()) as conn:
         db.replace_board(conn, db.DEFAULT_BOARD_ID, column_inputs, card_inputs)
-        return db.fetch_board(conn, db.DEFAULT_BOARD_ID)
+        result = db.fetch_board(conn, db.DEFAULT_BOARD_ID)
+    logger.info("Board saved: %d columns, %d cards", len(column_inputs), len(card_inputs))
+    return result

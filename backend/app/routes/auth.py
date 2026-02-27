@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from app.auth import (
@@ -9,6 +11,8 @@ from app.auth import (
     is_authenticated,
 )
 from app.models import LoginRequest
+
+logger = logging.getLogger("pm.auth")
 
 router = APIRouter()
 
@@ -22,9 +26,11 @@ def auth_status(request: Request) -> dict:
 def login(payload: LoginRequest, response: Response) -> dict:
     valid_username, valid_password = get_credentials()
     if payload.username != valid_username or payload.password != valid_password:
+        logger.warning("Login failed: invalid credentials for username %r", payload.username)
         raise HTTPException(status_code=401, detail="invalid_credentials")
 
     token = create_session()
+    logger.info("Login: session created for username %r", payload.username)
     response.set_cookie(
         key=AUTH_COOKIE_NAME,
         value=token,
@@ -40,4 +46,5 @@ def login(payload: LoginRequest, response: Response) -> dict:
 def logout(request: Request, response: Response) -> dict:
     invalidate_session(request)
     response.delete_cookie(AUTH_COOKIE_NAME, path="/")
+    logger.info("Logout: session invalidated")
     return {"status": "ok"}

@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import Any
 
@@ -15,6 +16,8 @@ from app.auth import AUTH_COOKIE_NAME, require_auth
 from app.board import build_board_inputs
 from app.config import get_db_path
 from app.models import AiBoardRequest, BoardPayload
+
+logger = logging.getLogger("pm.ai")
 
 router = APIRouter()
 
@@ -48,6 +51,7 @@ def ai_board(payload: AiBoardRequest, request: Request) -> dict[str, Any]:
 
     session_token = request.cookies.get(AUTH_COOKIE_NAME, "")
     _check_rate_limit(session_token)
+    logger.info("AI board request: %d messages", len(payload.messages))
 
     with db.get_connection(get_db_path()) as conn:
         board = db.fetch_board(conn, db.DEFAULT_BOARD_ID)

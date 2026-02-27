@@ -142,6 +142,31 @@ def test_ai_board_move_card_with_toColumnId(tmp_path: Path, monkeypatch: pytest.
     assert "card-1" in done_col["cardIds"]
 
 
+def test_ai_board_empty_messages_returns_400(tmp_path: Path) -> None:
+    setup_test_db(tmp_path)
+    client = TestClient(app)
+    login(client)
+
+    response = client.post("/api/ai/board", json={"messages": []})
+    assert response.status_code == 400
+    assert response.json()["detail"] == "missing_messages"
+
+
+def test_ai_board_missing_api_key_returns_500(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    setup_test_db(tmp_path)
+    client = TestClient(app)
+    login(client)
+
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    response = client.post(
+        "/api/ai/board",
+        json={"messages": [{"role": "user", "content": "Do something"}]},
+    )
+    assert response.status_code == 500
+    assert response.json()["detail"] == "missing_openrouter_key"
+
+
 def test_ai_board_rate_limit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     setup_test_db(tmp_path)
     client = TestClient(app)

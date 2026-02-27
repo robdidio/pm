@@ -16,7 +16,6 @@ class ColumnInput:
     id: str
     title: str
     position: int
-    card_ids: list[str]
 
 
 @dataclass(frozen=True)
@@ -35,11 +34,11 @@ DEFAULT_BOARD_TITLE = "My Board"
 # NOTE: This seed data mirrors frontend/src/lib/kanban.ts initialData.
 # If you change cards or columns here, update kanban.ts to match.
 DEFAULT_COLUMNS = [
-    ColumnInput("col-backlog", "Backlog", 0, ["card-1", "card-2"]),
-    ColumnInput("col-discovery", "Discovery", 1, ["card-3"]),
-    ColumnInput("col-progress", "In Progress", 2, ["card-4", "card-5"]),
-    ColumnInput("col-review", "Review", 3, ["card-6"]),
-    ColumnInput("col-done", "Done", 4, ["card-7", "card-8"]),
+    ColumnInput("col-backlog", "Backlog", 0),
+    ColumnInput("col-discovery", "Discovery", 1),
+    ColumnInput("col-progress", "In Progress", 2),
+    ColumnInput("col-review", "Review", 3),
+    ColumnInput("col-done", "Done", 4),
 ]
 
 DEFAULT_CARDS = [

@@ -58,7 +58,13 @@ def build_ai_system_prompt(board: dict[str, Any]) -> str:
                 "cardId": "card-1",
                 "title": "Title",
                 "details": "Details",
-            }
+            },
+            {
+                "type": "move_card",
+                "cardId": "card-1",
+                "columnId": "col-1",
+                "position": 0,
+            },
         ],
         "assistantMessage": "Updated card-1 details.",
     }
@@ -89,7 +95,12 @@ def build_ai_system_prompt(board: dict[str, Any]) -> str:
         " keep the board unchanged, and set operations to an empty array. "
         "Use schemaVersion 1. "
         "Use unique string ids; for new cards prefer 'card-' prefix. "
-        "Operations types: create_card, update_card, move_card, delete_card, rename_column. "
+        "Operation field names (use exactly these): "
+        "create_card(card, columnId, position), "
+        "update_card(cardId, title, details), "
+        "move_card(cardId, columnId, position), "
+        "delete_card(cardId), "
+        "rename_column(columnId, title). "
         "Ensure every cardId in columns exists in cards. "
         f"Schema example: {schema_json} "
         f"Summary example: {summary_json} "

@@ -90,6 +90,48 @@ def test_ai_board_rejects_invalid_schema(tmp_path: Path, monkeypatch: pytest.Mon
     assert response.json()["detail"] == "openrouter_invalid_schema"
 
 
+def test_ai_board_move_card_with_toColumnId(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """AI may use toColumnId instead of columnId for move_card — both must be accepted."""
+    setup_test_db(tmp_path)
+    client = TestClient(app)
+    login(client)
+
+    ai_payload = {
+        "schemaVersion": 1,
+        "board": {
+            "columns": [
+                {"id": "col-1", "title": "Todo", "cardIds": []},
+                {"id": "col-2", "title": "Done", "cardIds": ["card-1"]},
+            ],
+            "cards": {
+                "card-1": {"id": "card-1", "title": "A card", "details": "Details"}
+            },
+        },
+        "operations": [
+            {
+                "type": "move_card",
+                "cardId": "card-1",
+                "toColumnId": "col-2",
+            }
+        ],
+    }
+
+    def fake_call_openrouter_messages(_: list[dict[str, str]]) -> str:
+        return json.dumps(ai_payload)
+
+    monkeypatch.setattr(routes_ai, "call_openrouter_messages", fake_call_openrouter_messages)
+
+    response = client.post(
+        "/api/ai/board",
+        json={"messages": [{"role": "user", "content": "Move card-1 to Done"}]},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["operations"][0]["type"] == "move_card"
+    done_col = next(c for c in payload["board"]["columns"] if c["id"] == "col-2")
+    assert "card-1" in done_col["cardIds"]
+
+
 def test_ai_board_summary_bypasses_ai(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     setup_test_db(tmp_path)
     client = TestClient(app)

@@ -50,8 +50,12 @@ class AiOperationUpdateCard(BaseModel):
 
 class AiOperationMoveCard(BaseModel):
     type: Literal["move_card"]
-    cardId: str
-    columnId: str = Field(validation_alias=AliasChoices("columnId", "toColumnId"))
+    cardId: str = Field(validation_alias=AliasChoices("cardId", "card_id"))
+    columnId: str = Field(
+        validation_alias=AliasChoices(
+            "columnId", "toColumnId", "targetColumnId", "column_id", "to_column_id"
+        )
+    )
     position: int | None = None
 
 

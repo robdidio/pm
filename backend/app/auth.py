@@ -1,5 +1,6 @@
 import os
 import secrets
+import threading
 import time
 
 from fastapi import HTTPException, Request
@@ -13,6 +14,7 @@ SESSION_TTL = 24 * 60 * 60
 # Per-process session store: maps random token -> creation timestamp (monotonic).
 # Sessions are cleared on server restart, which is acceptable for this MVP.
 _active_sessions: dict[str, float] = {}
+_sessions_lock = threading.Lock()
 
 
 def is_authenticated(request: Request) -> bool:
@@ -23,7 +25,8 @@ def is_authenticated(request: Request) -> bool:
     if created_at is None:
         return False
     if time.monotonic() - created_at > SESSION_TTL:
-        _active_sessions.pop(token, None)
+        with _sessions_lock:
+            _active_sessions.pop(token, None)
         return False
     return True
 
@@ -43,12 +46,13 @@ def get_credentials() -> tuple[str, str]:
 
 def create_session() -> str:
     now = time.monotonic()
-    # Opportunistically evict expired sessions on each new login.
-    expired = [t for t, ts in _active_sessions.items() if now - ts > SESSION_TTL]
-    for t in expired:
-        del _active_sessions[t]
-    token = secrets.token_hex(32)
-    _active_sessions[token] = now
+    with _sessions_lock:
+        # Opportunistically evict expired sessions on each new login.
+        expired = [t for t, ts in _active_sessions.items() if now - ts > SESSION_TTL]
+        for t in expired:
+            del _active_sessions[t]
+        token = secrets.token_hex(32)
+        _active_sessions[token] = now
     return token
 
 

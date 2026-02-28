@@ -143,15 +143,9 @@ def parse_ai_board_response(raw: str) -> AiBoardResponse:
     logger.debug("AI raw response: %s", raw[:2000])
     try:
         data = json.loads(raw)
-    except json.JSONDecodeError:
-        start = raw.find("{")
-        end = raw.rfind("}")
-        if start == -1 or end == -1 or end <= start:
-            raise HTTPException(status_code=502, detail="openrouter_invalid_json")
-        try:
-            data = json.loads(raw[start : end + 1])
-        except json.JSONDecodeError as exc:
-            raise HTTPException(status_code=502, detail="openrouter_invalid_json") from exc
+    except json.JSONDecodeError as exc:
+        logger.warning("AI response is not valid JSON: %s", raw[:200])
+        raise HTTPException(status_code=502, detail="openrouter_invalid_json") from exc
 
     if "board" not in data:
         logger.warning("AI response missing 'board' key")
@@ -172,6 +166,12 @@ def parse_ai_board_response(raw: str) -> AiBoardResponse:
             raise HTTPException(status_code=502, detail="openrouter_invalid_schema")
         if "id" not in card_data:
             logger.warning("AI response: card %s missing 'id' field", card_id)
+            raise HTTPException(status_code=502, detail="openrouter_invalid_schema")
+        if card_data["id"] != card_id:
+            logger.warning(
+                "AI response: card key %r has mismatched 'id' field %r",
+                card_id, card_data["id"],
+            )
             raise HTTPException(status_code=502, detail="openrouter_invalid_schema")
 
     try:

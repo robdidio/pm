@@ -2,8 +2,10 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Callable
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request, Response
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import db
@@ -15,6 +17,8 @@ STATIC_DIR = BASE_DIR / "static"
 
 logger = logging.getLogger("pm.main")
 
+# Next.js static exports embed inline scripts and styles for hydration.
+# 'unsafe-inline' is required until nonce-based CSP is implemented.
 _CSP = (
     "default-src 'self'; "
     "script-src 'self' 'unsafe-inline'; "
@@ -23,6 +27,8 @@ _CSP = (
     "font-src 'self' data:; "
     "connect-src 'self';"
 )
+
+_CSRF_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 @asynccontextmanager
@@ -45,6 +51,20 @@ from app.routes.ai import router as ai_router  # noqa: E402
 app.include_router(auth_router)
 app.include_router(board_router)
 app.include_router(ai_router)
+
+@app.middleware("http")
+async def csrf_guard(request: Request, call_next: Callable) -> Response:
+    if request.method not in _CSRF_SAFE_METHODS:
+        if request.headers.get("sec-fetch-site") == "cross-site":
+            return JSONResponse(status_code=403, content={"detail": "forbidden"})
+        origin = request.headers.get("origin")
+        if origin:
+            origin_host = urlparse(origin).netloc
+            host = request.headers.get("host", "")
+            if origin_host != host:
+                return JSONResponse(status_code=403, content={"detail": "forbidden"})
+    return await call_next(request)
+
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next: Callable) -> Response:

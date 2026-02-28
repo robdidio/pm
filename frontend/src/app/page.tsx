@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { LoginPanel } from "@/components/LoginPanel";
 
@@ -91,7 +92,9 @@ export default function Home() {
           Log out
         </button>
       </div>
-      <KanbanBoard />
+      <ErrorBoundary>
+        <KanbanBoard />
+      </ErrorBoundary>
     </div>
   );
 }

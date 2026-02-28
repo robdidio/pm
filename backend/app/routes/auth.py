@@ -1,4 +1,6 @@
 import logging
+import secrets
+import threading
 import time
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -20,17 +22,21 @@ router = APIRouter()
 # Max login attempts per IP per 60-second sliding window.
 _LOGIN_RATE_LIMIT = 10
 _LOGIN_RATE_WINDOW = 60.0
+# In-memory store: state is lost on restart and is not shared across
+# multiple processes. Acceptable for this single-container MVP.
 _login_attempts: dict[str, list[float]] = {}
+_rate_limit_lock = threading.Lock()
 
 
 def _check_login_rate_limit(ip: str) -> None:
     now = time.monotonic()
-    attempts = _login_attempts.get(ip, [])
-    attempts = [t for t in attempts if now - t < _LOGIN_RATE_WINDOW]
-    if len(attempts) >= _LOGIN_RATE_LIMIT:
-        raise HTTPException(status_code=429, detail="rate_limit_exceeded")
-    attempts.append(now)
-    _login_attempts[ip] = attempts
+    with _rate_limit_lock:
+        attempts = _login_attempts.get(ip, [])
+        attempts = [t for t in attempts if now - t < _LOGIN_RATE_WINDOW]
+        if len(attempts) >= _LOGIN_RATE_LIMIT:
+            raise HTTPException(status_code=429, detail="rate_limit_exceeded")
+        attempts.append(now)
+        _login_attempts[ip] = attempts
 
 
 @router.get("/api/auth/status")
@@ -44,7 +50,9 @@ def login(payload: LoginRequest, request: Request, response: Response) -> dict:
     _check_login_rate_limit(client_ip)
 
     valid_username, valid_password = get_credentials()
-    if payload.username != valid_username or payload.password != valid_password:
+    ok = secrets.compare_digest(payload.username, valid_username) and \
+         secrets.compare_digest(payload.password, valid_password)
+    if not ok:
         logger.warning("Login failed: invalid credentials for username %r from %s", payload.username, client_ip)
         raise HTTPException(status_code=401, detail="invalid_credentials")
 

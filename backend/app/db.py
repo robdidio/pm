@@ -252,6 +252,7 @@ def replace_board(
     columns: Iterable[ColumnInput],
     cards: Iterable[CardInput],
 ) -> None:
+    """Replace all board data atomically. Must be called within a `with conn:` block."""
     # Preserve creation timestamps so they survive full-board replacements.
     existing_created: dict[str, str] = {
         row["id"]: row["created_at"]

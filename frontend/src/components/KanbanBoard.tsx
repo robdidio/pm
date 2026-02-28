@@ -276,6 +276,7 @@ export const KanbanBoard = () => {
       }
 
       if (response.status === 404) {
+        setChatMessages(chatMessages);
         setChatError("AI service is unavailable in local-only mode.");
         return;
       }
@@ -288,22 +289,27 @@ export const KanbanBoard = () => {
       }
 
       if (detailMessage === "openrouter_invalid_schema") {
+        setChatMessages(chatMessages);
         setChatError("AI response did not match the required schema. Try again.");
         return;
       }
 
       if (detailMessage === "openrouter_invalid_json") {
+        setChatMessages(chatMessages);
         setChatError("AI response was not valid JSON. Try again.");
         return;
       }
 
       if (detailMessage === "upstream_error") {
+        setChatMessages(chatMessages);
         setChatError("AI service returned an error. Try again.");
         return;
       }
 
+      setChatMessages(chatMessages);
       setChatError("Unable to reach the AI service. Please try again.");
     } catch {
+      setChatMessages(chatMessages);
       setChatError("Unable to reach the AI service. Please try again.");
     } finally {
       setIsAiSending(false);

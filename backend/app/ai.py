@@ -174,6 +174,15 @@ def parse_ai_board_response(raw: str) -> AiBoardResponse:
             )
             raise HTTPException(status_code=502, detail="openrouter_invalid_schema")
 
+    for column in data.get("board", {}).get("columns", []):
+        for ref_id in column.get("cardIds", []):
+            if ref_id not in cards:
+                logger.warning(
+                    "AI response: column %r references unknown cardId %r",
+                    column.get("id"), ref_id,
+                )
+                raise HTTPException(status_code=502, detail="openrouter_invalid_schema")
+
     try:
         parsed = AiBoardResponse.model_validate(data)
     except ValidationError as exc:

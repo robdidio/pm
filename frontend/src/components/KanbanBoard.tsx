@@ -288,7 +288,7 @@ export const KanbanBoard = () => {
         detailMessage = null;
       }
 
-      if (detailMessage === "openrouter_invalid_schema") {
+      if (detailMessage === "openrouter_invalid_schema" || detailMessage === "invalid_board") {
         setChatMessages(chatMessages);
         setChatError("AI response did not match the required schema. Try again.");
         return;

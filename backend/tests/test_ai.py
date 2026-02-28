@@ -142,6 +142,35 @@ def test_ai_board_move_card_with_toColumnId(tmp_path: Path, monkeypatch: pytest.
     assert "card-1" in done_col["cardIds"]
 
 
+def test_ai_board_rejects_dangling_card_reference(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Column cardIds referencing a card absent from the cards dict must return 502."""
+    setup_test_db(tmp_path)
+    client = TestClient(app)
+    login(client)
+
+    ai_payload = {
+        "schemaVersion": 1,
+        "board": {
+            "columns": [{"id": "col-1", "title": "Todo", "cardIds": ["card-ghost"]}],
+            "cards": {},
+        },
+        "operations": [],
+    }
+
+    monkeypatch.setattr(
+        routes_ai,
+        "call_openrouter_messages",
+        lambda _: json.dumps(ai_payload),
+    )
+
+    response = client.post(
+        "/api/ai/board",
+        json={"messages": [{"role": "user", "content": "Move a card"}]},
+    )
+    assert response.status_code == 502
+    assert response.json()["detail"] == "openrouter_invalid_schema"
+
+
 def test_ai_board_empty_messages_returns_400(tmp_path: Path) -> None:
     setup_test_db(tmp_path)
     client = TestClient(app)

@@ -29,9 +29,7 @@ def call_openrouter_messages(messages: list[dict[str, str]]) -> str:
         response = client.post(OPENROUTER_URL, json=payload, headers=headers)
 
     if response.status_code >= 400:
-        raise HTTPException(
-            status_code=502, detail=f"openrouter_error:{response.status_code}"
-        )
+        raise HTTPException(status_code=502, detail="upstream_error")
 
     data = response.json()
     message = data.get("choices", [{}])[0].get("message", {}).get("content")

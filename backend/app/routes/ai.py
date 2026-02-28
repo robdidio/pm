@@ -30,6 +30,10 @@ _ai_request_times: dict[str, list[float]] = {}
 def _check_rate_limit(session_token: str) -> None:
     now = time.monotonic()
     window = 60.0
+    # Evict fully-expired entries for other tokens opportunistically.
+    stale = [t for t, ts in _ai_request_times.items() if not any(now - e < window for e in ts)]
+    for t in stale:
+        del _ai_request_times[t]
     times = _ai_request_times.get(session_token, [])
     times = [t for t in times if now - t < window]
     if len(times) >= AI_RATE_LIMIT:

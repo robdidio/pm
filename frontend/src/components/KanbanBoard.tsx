@@ -297,9 +297,8 @@ export const KanbanBoard = () => {
         return;
       }
 
-      if (detailMessage?.startsWith("openrouter_error:")) {
-        const status = detailMessage.split(":")[1] ?? "unknown";
-        setChatError(`AI service returned an error (${status}). Try again.`);
+      if (detailMessage === "upstream_error") {
+        setChatError("AI service returned an error. Try again.");
         return;
       }
 

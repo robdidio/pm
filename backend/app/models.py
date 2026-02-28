@@ -4,8 +4,8 @@ from pydantic import AliasChoices, BaseModel, Field
 
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(max_length=100)
+    password: str = Field(max_length=1000)
 
 
 class CardPayload(BaseModel):
@@ -17,21 +17,21 @@ class CardPayload(BaseModel):
 class ColumnPayload(BaseModel):
     id: str
     title: str = Field(max_length=100)
-    cardIds: list[str]
+    cardIds: list[str] = Field(max_length=500)
 
 
 class BoardPayload(BaseModel):
-    columns: list[ColumnPayload]
-    cards: dict[str, CardPayload]
+    columns: list[ColumnPayload] = Field(max_length=20)
+    cards: Annotated[dict[str, CardPayload], Field(max_length=500)]
 
 
 class ChatMessage(BaseModel):
-    role: Literal["user", "assistant", "system"]
-    content: str
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=20_000)
 
 
 class AiBoardRequest(BaseModel):
-    messages: list[ChatMessage]
+    messages: list[ChatMessage] = Field(max_length=200)
 
 
 class AiOperationCreateCard(BaseModel):

@@ -24,6 +24,7 @@ router = APIRouter()
 
 # Max AI requests per session token per 60-second sliding window.
 AI_RATE_LIMIT = 20
+_AI_RATE_WINDOW = 60.0
 
 # In-memory store: state is lost on restart and is not shared across
 # multiple processes. Acceptable for this single-container MVP.
@@ -33,14 +34,13 @@ _rate_limit_lock = threading.Lock()
 
 def _check_rate_limit(session_token: str) -> None:
     now = time.monotonic()
-    window = 60.0
     with _rate_limit_lock:
         # Evict fully-expired entries for other tokens opportunistically.
-        stale = [t for t, ts in _ai_request_times.items() if not any(now - e < window for e in ts)]
+        stale = [t for t, ts in _ai_request_times.items() if not any(now - e < _AI_RATE_WINDOW for e in ts)]
         for t in stale:
             del _ai_request_times[t]
         times = _ai_request_times.get(session_token, [])
-        times = [t for t in times if now - t < window]
+        times = [t for t in times if now - t < _AI_RATE_WINDOW]
         if len(times) >= AI_RATE_LIMIT:
             raise HTTPException(status_code=429, detail="rate_limit_exceeded")
         times.append(now)

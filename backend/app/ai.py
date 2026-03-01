@@ -150,16 +150,18 @@ def parse_ai_board_response(raw: str) -> AiBoardResponse:
     if "board" not in data:
         logger.warning("AI response missing 'board' key")
         raise HTTPException(status_code=502, detail="openrouter_invalid_schema")
-    
-    if "columns" not in data.get("board", {}):
+
+    board_data = data["board"]
+
+    if "columns" not in board_data:
         logger.warning("AI response missing 'board.columns'")
         raise HTTPException(status_code=502, detail="openrouter_invalid_schema")
-    
-    if "cards" not in data.get("board", {}):
+
+    if "cards" not in board_data:
         logger.warning("AI response missing 'board.cards'")
         raise HTTPException(status_code=502, detail="openrouter_invalid_schema")
-    
-    cards = data.get("board", {}).get("cards", {})
+
+    cards = board_data["cards"]
     for card_id, card_data in cards.items():
         if not isinstance(card_data, dict):
             logger.warning("AI response: card %s is not a dict", card_id)
@@ -174,7 +176,7 @@ def parse_ai_board_response(raw: str) -> AiBoardResponse:
             )
             raise HTTPException(status_code=502, detail="openrouter_invalid_schema")
 
-    for column in data.get("board", {}).get("columns", []):
+    for column in board_data["columns"]:
         for ref_id in column.get("cardIds", []):
             if ref_id not in cards:
                 logger.warning(

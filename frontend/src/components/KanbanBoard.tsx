@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -47,7 +47,7 @@ export const KanbanBoard = () => {
     return closestCorners(args);
   };
 
-  const cardsById = useMemo(() => board?.cards ?? {}, [board]);
+  const cardsById = board?.cards ?? {};
 
   const formatOperationsMessage = (operations: Array<{ type: string }>) => {
     if (operations.length === 0) {
@@ -68,6 +68,9 @@ export const KanbanBoard = () => {
       setIsLoading(true);
       setErrorMessage(null);
 
+      const stored = localStorage.getItem(LOCAL_BOARD_KEY);
+      const localFallback = stored ? (JSON.parse(stored) as BoardData) : initialData;
+
       try {
         const response = await fetch("/api/board");
         if (response.ok) {
@@ -80,20 +83,16 @@ export const KanbanBoard = () => {
         }
 
         if (response.status === 404) {
-          const stored = localStorage.getItem(LOCAL_BOARD_KEY);
-          const fallback = stored ? (JSON.parse(stored) as BoardData) : initialData;
           if (isActive) {
-            setBoard(cloneBoard(fallback));
+            setBoard(cloneBoard(localFallback));
           }
           return;
         }
 
         throw new Error("load_failed");
       } catch {
-        const stored = localStorage.getItem(LOCAL_BOARD_KEY);
-        const fallback = stored ? (JSON.parse(stored) as BoardData) : initialData;
         if (isActive) {
-          setBoard(cloneBoard(fallback));
+          setBoard(cloneBoard(localFallback));
           setErrorMessage("Unable to reach the server. Working locally.");
         }
       } finally {
@@ -122,13 +121,8 @@ export const KanbanBoard = () => {
       });
 
       if (response.ok) {
-        const contentType = response.headers.get("content-type") ?? "";
-        if (contentType.includes("application/json")) {
-          const data = (await response.json()) as BoardData;
-          setBoard(data);
-        } else {
-          setBoard(nextBoard);
-        }
+        const data = (await response.json()) as BoardData;
+        setBoard(data);
         localStorage.removeItem(LOCAL_BOARD_KEY);
         return;
       }
@@ -242,6 +236,7 @@ export const KanbanBoard = () => {
     setIsAiSending(true);
     setChatError(null);
 
+    let errorMsg: string | null = null;
     try {
       const response = await fetch("/api/ai/board", {
         method: "POST",
@@ -276,10 +271,10 @@ export const KanbanBoard = () => {
       }
 
       if (response.status === 404) {
-        setChatMessages(chatMessages);
-        setChatError("AI service is unavailable in local-only mode.");
+        errorMsg = "AI service is unavailable in local-only mode.";
         return;
       }
+
       let detailMessage: string | null = null;
       try {
         const errorPayload = (await response.json()) as { detail?: string };
@@ -289,29 +284,25 @@ export const KanbanBoard = () => {
       }
 
       if (detailMessage === "openrouter_invalid_schema" || detailMessage === "invalid_board") {
-        setChatMessages(chatMessages);
-        setChatError("AI response did not match the required schema. Try again.");
+        errorMsg = "AI response did not match the required schema. Try again.";
         return;
       }
-
       if (detailMessage === "openrouter_invalid_json") {
-        setChatMessages(chatMessages);
-        setChatError("AI response was not valid JSON. Try again.");
+        errorMsg = "AI response was not valid JSON. Try again.";
         return;
       }
-
       if (detailMessage === "upstream_error") {
-        setChatMessages(chatMessages);
-        setChatError("AI service returned an error. Try again.");
+        errorMsg = "AI service returned an error. Try again.";
         return;
       }
-
-      setChatMessages(chatMessages);
-      setChatError("Unable to reach the AI service. Please try again.");
+      errorMsg = "Unable to reach the AI service. Please try again.";
     } catch {
-      setChatMessages(chatMessages);
-      setChatError("Unable to reach the AI service. Please try again.");
+      errorMsg = "Unable to reach the AI service. Please try again.";
     } finally {
+      if (errorMsg !== null) {
+        setChatMessages(chatMessages);
+        setChatError(errorMsg);
+      }
       setIsAiSending(false);
     }
   };
